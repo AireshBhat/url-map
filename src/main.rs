@@ -1,13 +1,17 @@
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
-use std::sync::Mutex;
+use std::sync::Arc;
 
 mod routes;
 mod handlers;
 mod services;
+mod storage;
+mod models;
+mod errors;
 
 use services::UrlService;
+use storage::{MemoryStorage, StorageConfig};
 
 async fn health_check() -> impl Responder {
     HttpResponse::Ok().json(serde_json::json!({
@@ -25,8 +29,11 @@ async fn main() -> std::io::Result<()> {
 
     info!("Starting URL Shortener Service...");
 
-    // Create URL service
-    let url_service = web::Data::new(Mutex::new(UrlService::new()));
+    // Create storage layer
+    let storage = Arc::new(MemoryStorage::new(StorageConfig::default()));
+    
+    // Create URL service with storage
+    let url_service = web::Data::new(UrlService::new(storage));
 
     HttpServer::new(move || {
         App::new()

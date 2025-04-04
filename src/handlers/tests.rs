@@ -1,12 +1,18 @@
 use actix_web::{test, web, App};
-use std::sync::Mutex;
 use crate::services::UrlService;
+use crate::storage::{MemoryStorage, StorageConfig};
+use std::sync::Arc;
 use super::*;
+
+async fn create_test_service() -> web::Data<UrlService> {
+    let storage = Arc::new(MemoryStorage::new(StorageConfig::default()));
+    web::Data::new(UrlService::new(storage))
+}
 
 #[actix_rt::test]
 async fn test_create_url_success() {
     // Setup
-    let service = web::Data::new(Mutex::new(UrlService::new()));
+    let service = create_test_service().await;
     let app = test::init_service(
         App::new()
             .app_data(service.clone())
@@ -34,7 +40,7 @@ async fn test_create_url_success() {
 #[actix_rt::test]
 async fn test_create_url_invalid() {
     // Setup
-    let service = web::Data::new(Mutex::new(UrlService::new()));
+    let service = create_test_service().await;
     let app = test::init_service(
         App::new()
             .app_data(service.clone())
@@ -59,10 +65,8 @@ async fn test_create_url_invalid() {
 #[actix_rt::test]
 async fn test_redirect_success() {
     // Setup
-    let service = web::Data::new(Mutex::new(UrlService::new()));
-    let mut service_lock = service.lock().unwrap();
-    let shortened_url = service_lock.create_short_url("https://example.com".to_string()).unwrap();
-    drop(service_lock);
+    let service = create_test_service().await;
+    let shortened_url = service.create_short_url("https://example.com".to_string()).await.unwrap();
 
     let app = test::init_service(
         App::new()
@@ -89,7 +93,7 @@ async fn test_redirect_success() {
 #[actix_rt::test]
 async fn test_redirect_not_found() {
     // Setup
-    let service = web::Data::new(Mutex::new(UrlService::new()));
+    let service = create_test_service().await;
     let app = test::init_service(
         App::new()
             .app_data(service.clone())
@@ -111,10 +115,8 @@ async fn test_redirect_not_found() {
 #[actix_rt::test]
 async fn test_get_stats_success() {
     // Setup
-    let service = web::Data::new(Mutex::new(UrlService::new()));
-    let mut service_lock = service.lock().unwrap();
-    let shortened_url = service_lock.create_short_url("https://example.com".to_string()).unwrap();
-    drop(service_lock);
+    let service = create_test_service().await;
+    let shortened_url = service.create_short_url("https://example.com".to_string()).await.unwrap();
 
     let app = test::init_service(
         App::new()
@@ -141,7 +143,7 @@ async fn test_get_stats_success() {
 #[actix_rt::test]
 async fn test_get_stats_not_found() {
     // Setup
-    let service = web::Data::new(Mutex::new(UrlService::new()));
+    let service = create_test_service().await;
     let app = test::init_service(
         App::new()
             .app_data(service.clone())
@@ -163,10 +165,8 @@ async fn test_get_stats_not_found() {
 #[actix_rt::test]
 async fn test_visit_count_increment() {
     // Setup
-    let service = web::Data::new(Mutex::new(UrlService::new()));
-    let mut service_lock = service.lock().unwrap();
-    let shortened_url = service_lock.create_short_url("https://example.com".to_string()).unwrap();
-    drop(service_lock);
+    let service = create_test_service().await;
+    let shortened_url = service.create_short_url("https://example.com".to_string()).await.unwrap();
 
     let app = test::init_service(
         App::new()

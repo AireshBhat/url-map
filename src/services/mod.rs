@@ -1,19 +1,9 @@
-use std::collections::HashMap;
 use chrono::{DateTime, Utc};
-use thiserror::Error;
 use url::Url;
-
-#[derive(Debug, Error)]
-pub enum ServiceError {
-    #[error("Invalid URL: {0}")]
-    InvalidUrl(String),
-    #[error("URL too long")]
-    UrlTooLong,
-    #[error("Internal error: {0}")]
-    Internal(String),
-}
-
-pub type ServiceResult<T> = Result<T, ServiceError>;
+use crate::errors::{UrlShortenerResult, UrlShortenerErrorType};
+use crate::models::ShortenedUrl as StorageShortenedUrl;
+use crate::storage::StorageRef;
+use nanoid::nanoid;
 
 #[derive(Debug, Clone)]
 pub struct ShortenedUrl {
@@ -23,75 +13,74 @@ pub struct ShortenedUrl {
     pub visits: u64,
 }
 
+impl From<ShortenedUrl> for StorageShortenedUrl {
+    fn from(url: ShortenedUrl) -> Self {
+        Self {
+            id: 0, // Will be set by storage layer
+            original_url: url.original_url,
+            short_url: url.short_code,
+            created_at: url.created_at,
+            visits: url.visits as i64,
+        }
+    }
+}
+
+impl From<StorageShortenedUrl> for ShortenedUrl {
+    fn from(url: StorageShortenedUrl) -> Self {
+        Self {
+            short_code: url.short_url,
+            original_url: url.original_url,
+            created_at: url.created_at,
+            visits: url.visits as u64,
+        }
+    }
+}
+
 pub struct UrlService {
-    // In-memory storage for now, will be replaced with proper storage layer
-    urls: HashMap<String, ShortenedUrl>,
+    storage: StorageRef,
 }
 
 impl UrlService {
-    pub fn new() -> Self {
-        Self {
-            urls: HashMap::new(),
-        }
+    pub fn new(storage: StorageRef) -> Self {
+        Self { storage }
     }
 
-    pub fn create_short_url(&mut self, original_url: String) -> ServiceResult<ShortenedUrl> {
+    pub async fn create_short_url(&self, original_url: String) -> UrlShortenerResult<ShortenedUrl> {
         // Validate URL
         let url = Url::parse(&original_url)
-            .map_err(|_| ServiceError::InvalidUrl(original_url.clone()))?;
+            .map_err(|e| UrlShortenerErrorType::InvalidUrl(e.to_string()))?;
 
         // Check URL length
         if original_url.len() > 2048 {
-            return Err(ServiceError::UrlTooLong);
+            return Err(UrlShortenerErrorType::UrlTooLong("URL exceeds 2048 characters".to_string()).into());
         }
 
         // Generate short code
-        let short_code = self.generate_short_code();
+        let short_code = nanoid!(10);
 
         // Create shortened URL
         let shortened_url = ShortenedUrl {
-            short_code: short_code.clone(),
+            short_code,
             original_url: url.to_string(),
             created_at: Utc::now(),
             visits: 0,
         };
 
+        // Store the URL using the storage layer
+        let storage_url: StorageShortenedUrl = shortened_url.into();
+        let saved_url = self.storage.save_url(storage_url).await?;
 
-        // Store the URL
-        self.urls.insert(short_code, shortened_url.clone());
-
-        Ok(shortened_url)
+        Ok(saved_url.into())
     }
 
-    pub fn get_original_url(&mut self, short_code: &str) -> ServiceResult<String> {
-        let url = self.urls.get_mut(short_code)
-            .ok_or_else(|| ServiceError::Internal("URL not found".to_string()))?;
-
-        // Increment visit count
-        url.visits += 1;
-
-        Ok(url.original_url.clone())
+    pub async fn get_original_url(&self, short_code: &str) -> UrlShortenerResult<String> {
+        let url = self.storage.get_url(short_code).await?;
+        Ok(url.original_url)
     }
 
-    pub fn get_url_stats(&self, short_code: &str) -> ServiceResult<ShortenedUrl> {
-        self.urls.get(short_code)
-            .cloned()
-            .ok_or_else(|| ServiceError::Internal("URL not found".to_string()))
-    }
-
-    fn generate_short_code(&self) -> String {
-        // Simple implementation for now
-        // TODO: Implement a more robust short code generation algorithm
-        use rand::Rng;
-        const CHARSET: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        let mut rng = rand::thread_rng();
-        let code: String = (0..6)
-            .map(|_| {
-                let idx = rng.gen_range(0..CHARSET.len());
-                CHARSET[idx] as char
-            })
-            .collect();
-        code
+    pub async fn get_url_stats(&self, short_code: &str) -> UrlShortenerResult<ShortenedUrl> {
+        let url = self.storage.get_stats(short_code).await?;
+        Ok(url.into())
     }
 }
 

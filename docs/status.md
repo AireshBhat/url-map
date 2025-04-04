@@ -10,6 +10,15 @@
   - URL Generation Service
   - Access Tracking Service
   - Error Handling
+- Storage Layer
+  - Storage Trait
+  - In-Memory Implementation
+- Error Handling System
+  - Error Types and Enums
+  - Error Context and Backtrace
+  - HTTP Integration
+  - Database Error Mapping
+  - Custom Result Type
 
 ## In Progress
 - Project Setup
@@ -18,7 +27,9 @@
   - [x] Create middleware
   - [x] Create handler layer
   - [x] Implement handler logic
-  - [ ] Implement storage layer
+  - [x] Implement storage layer (basic)
+  - [x] Implement error handling
+  - [ ] Implement PostgreSQL storage
 
 ## Pending
 
@@ -71,15 +82,16 @@
 - [x] Access Tracking
   - [x] Logic to increment access counters
   - [x] Timestamp tracking for accesses
+- [x] Configure service to use storage layer
 
 ### Storage Layer
-- [ ] Storage Trait
+- [x] Storage Trait
+- [x] In-Memory Implementation
 - [ ] PostgreSQL Implementation
     * Implement Storage trait for PostgreSQL
     * Connection pooling
     * SQL queries for CRUD operations
 - [ ] SQLite Implementation (Optional)
-- [ ] In-Memory Implementation
 
 ### Data Models
 
@@ -100,33 +112,33 @@
 
 #### Error Types
 
-* Define comprehensive error enum
-* Categorize errors (validation, resource, database, etc.)
+* [x] Define comprehensive error enum
+* [x] Categorize errors (validation, resource, database, etc.)
 
 
 #### Error Structure
 
-* Main error type with context and backtrace
-* Custom Result type
+* [x] Main error type with context and backtrace
+* [x] Custom Result type
 
 
 #### Error Conversions
 
-* From database errors
-* From validation errors
-* From HTTP errors
+* [x] From database errors
+* [x] From validation errors
+* [x] From HTTP errors
 
 
 #### Extension Traits
 
-* For error context enrichment
-* For error type conversion
+* [x] For error context enrichment
+* [x] For error type conversion
 
 
 #### HTTP Integration
 
-* Map errors to HTTP status codes
-* Format JSON error responses
+* [x] Map errors to HTTP status codes
+* [x] Format JSON error responses
 
 
 ### Configuration

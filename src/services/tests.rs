@@ -1,9 +1,17 @@
 use super::*;
+use crate::errors::UrlShortenerErrorType;
+use crate::storage::{MemoryStorage, StorageConfig};
+use std::sync::Arc;
 
-#[test]
-fn test_create_short_url_success() {
-    let mut service = UrlService::new();
-    let result = service.create_short_url("https://example.com".to_string());
+async fn create_test_service() -> UrlService {
+    let storage = Arc::new(MemoryStorage::new(StorageConfig::default()));
+    UrlService::new(storage)
+}
+
+#[tokio::test]
+async fn test_create_short_url_success() {
+    let service = create_test_service().await;
+    let result = service.create_short_url("https://example.com".to_string()).await;
     
     assert!(result.is_ok());
     let shortened_url = result.unwrap();
@@ -12,77 +20,77 @@ fn test_create_short_url_success() {
     assert_eq!(shortened_url.visits, 0);
 }
 
-#[test]
-fn test_create_short_url_invalid() {
-    let mut service = UrlService::new();
-    let result = service.create_short_url("not-a-url".to_string());
+#[tokio::test]
+async fn test_create_short_url_invalid() {
+    let service = create_test_service().await;
+    let result = service.create_short_url("not-a-url".to_string()).await;
     
     assert!(result.is_err());
-    match result.unwrap_err() {
-        ServiceError::InvalidUrl(_) => (),
-        _ => panic!("Expected InvalidUrl error"),
+    match result.unwrap_err().error_type {
+        UrlShortenerErrorType::InvalidUrl(_) => (),
+        error_type => panic!("Expected InvalidUrl error, got {:?}", error_type),
     }
 }
 
-#[test]
-fn test_create_short_url_too_long() {
-    let mut service = UrlService::new();
+#[tokio::test]
+async fn test_create_short_url_too_long() {
+    let service = create_test_service().await;
     let long_url = "https://example.com/".repeat(1025); // 2048+ characters
-    let result = service.create_short_url(long_url);
+    let result = service.create_short_url(long_url).await;
     
     assert!(result.is_err());
-    match result.unwrap_err() {
-        ServiceError::UrlTooLong => (),
-        _ => panic!("Expected UrlTooLong error"),
+    match result.unwrap_err().error_type {
+        UrlShortenerErrorType::UrlTooLong(_) => (),
+        error_type => panic!("Expected UrlTooLong error, got {:?}", error_type),
     }
 }
 
-#[test]
-fn test_get_original_url_success() {
-    let mut service = UrlService::new();
+#[tokio::test]
+async fn test_get_original_url_success() {
+    let service = create_test_service().await;
     let original_url = "https://example.com".to_string();
-    let shortened_url = service.create_short_url(original_url.clone()).unwrap();
+    let shortened_url = service.create_short_url(original_url.clone()).await.unwrap();
     
-    let result = service.get_original_url(&shortened_url.short_code);
+    let result = service.get_original_url(&shortened_url.short_code).await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "https://example.com/");
 }
 
-#[test]
-fn test_get_original_url_not_found() {
-    let mut service = UrlService::new();
-    let result = service.get_original_url("nonexistent");
+#[tokio::test]
+async fn test_get_original_url_not_found() {
+    let service = create_test_service().await;
+    let result = service.get_original_url("nonexistent").await;
     
     assert!(result.is_err());
-    match result.unwrap_err() {
-        ServiceError::Internal(_) => (),
-        _ => panic!("Expected Internal error"),
+    match result.unwrap_err().error_type {
+        UrlShortenerErrorType::NotFound => (),
+        error_type => panic!("Expected NotFound error, got {:?}", error_type),
     }
 }
 
-#[test]
-fn test_get_original_url_increments_visits() {
-    let mut service = UrlService::new();
-    let shortened_url = service.create_short_url("https://example.com".to_string()).unwrap();
+#[tokio::test]
+async fn test_get_original_url_increments_visits() {
+    let service = create_test_service().await;
+    let shortened_url = service.create_short_url("https://example.com".to_string()).await.unwrap();
     
     // First visit
-    let _ = service.get_original_url(&shortened_url.short_code).unwrap();
-    let stats = service.get_url_stats(&shortened_url.short_code).unwrap();
+    let _ = service.get_original_url(&shortened_url.short_code).await.unwrap();
+    let stats = service.get_url_stats(&shortened_url.short_code).await.unwrap();
     assert_eq!(stats.visits, 1);
     
     // Second visit
-    let _ = service.get_original_url(&shortened_url.short_code).unwrap();
-    let stats = service.get_url_stats(&shortened_url.short_code).unwrap();
+    let _ = service.get_original_url(&shortened_url.short_code).await.unwrap();
+    let stats = service.get_url_stats(&shortened_url.short_code).await.unwrap();
     assert_eq!(stats.visits, 2);
 }
 
-#[test]
-fn test_get_url_stats_success() {
-    let mut service = UrlService::new();
+#[tokio::test]
+async fn test_get_url_stats_success() {
+    let service = create_test_service().await;
     let original_url = "https://example.com".to_string();
-    let shortened_url = service.create_short_url(original_url.clone()).unwrap();
+    let shortened_url = service.create_short_url(original_url.clone()).await.unwrap();
     
-    let result = service.get_url_stats(&shortened_url.short_code);
+    let result = service.get_url_stats(&shortened_url.short_code).await;
     assert!(result.is_ok());
     let stats = result.unwrap();
     assert_eq!(stats.short_code, shortened_url.short_code);
@@ -90,25 +98,14 @@ fn test_get_url_stats_success() {
     assert_eq!(stats.visits, 0);
 }
 
-#[test]
-fn test_get_url_stats_not_found() {
-    let service = UrlService::new();
-    let result = service.get_url_stats("nonexistent");
+#[tokio::test]
+async fn test_get_url_stats_not_found() {
+    let service = create_test_service().await;
+    let result = service.get_url_stats("nonexistent").await;
     
     assert!(result.is_err());
-    match result.unwrap_err() {
-        ServiceError::Internal(_) => (),
-        _ => panic!("Expected Internal error"),
+    match result.unwrap_err().error_type {
+        UrlShortenerErrorType::NotFound => (),
+        error_type => panic!("Expected NotFound error, got {:?}", error_type),
     }
 }
-
-#[test]
-fn test_short_code_generation() {
-    let service = UrlService::new();
-    let code1 = service.generate_short_code();
-    let code2 = service.generate_short_code();
-    
-    assert_eq!(code1.len(), 6);
-    assert_eq!(code2.len(), 6);
-    assert_ne!(code1, code2); // Very small chance of collision, but possible
-} 
