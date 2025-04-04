@@ -1,9 +1,13 @@
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
+use std::sync::Mutex;
 
 mod routes;
 mod handlers;
+mod services;
+
+use services::UrlService;
 
 async fn health_check() -> impl Responder {
     HttpResponse::Ok().json(serde_json::json!({
@@ -21,8 +25,13 @@ async fn main() -> std::io::Result<()> {
 
     info!("Starting URL Shortener Service...");
 
-    HttpServer::new(|| {
+    // Create URL service
+    let url_service = web::Data::new(Mutex::new(UrlService::new()));
+
+    HttpServer::new(move || {
         App::new()
+            // Add URL service to application state
+            .app_data(url_service.clone())
             // Add logging middleware
             .wrap(tracing_actix_web::TracingLogger::default())
             // Add compression middleware
