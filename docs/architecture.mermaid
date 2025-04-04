@@ -1,0 +1,66 @@
+flowchart TB
+    subgraph Client
+        Browser[Web Browser]
+        ApiClient[API Client]
+    end
+
+    subgraph "URL Shortener Service"
+        subgraph "HTTP Layer"
+            Router[Router]
+            Middleware[Middleware]
+        end
+
+        subgraph "Handler Layer"
+            CreateHandler[Create URL Handler]
+            RedirectHandler[Redirect Handler]
+            StatsHandler[Statistics Handler]
+        end
+
+        subgraph "Service Layer"
+            UrlService[URL Service]
+            MetricsService[Metrics Service]
+        end
+
+        subgraph "Repository Layer"
+            StorageTrait[Storage Trait]
+        end
+
+        subgraph "Storage Implementations"
+            PostgresRepo[PostgreSQL Repository]
+            SqliteRepo[SQLite Repository]
+            InMemoryRepo[In-Memory Repository]
+        end
+
+        subgraph "Database"
+            Postgres[(PostgreSQL)]
+            Sqlite[(SQLite)]
+        end
+
+        subgraph "Cross-Cutting Concerns"
+            Logging[Logging]
+            ErrorHandling[Error Handling]
+            Metrics[Prometheus Metrics]
+        end
+    end
+
+    Browser --> Router
+    ApiClient --> Router
+    
+    Router --> Middleware
+    Middleware --> CreateHandler & RedirectHandler & StatsHandler
+    
+    CreateHandler --> UrlService
+    RedirectHandler --> UrlService
+    StatsHandler --> MetricsService
+    
+    UrlService --> StorageTrait
+    MetricsService --> StorageTrait
+    
+    StorageTrait --> PostgresRepo & SqliteRepo & InMemoryRepo
+    
+    PostgresRepo --> Postgres
+    SqliteRepo --> Sqlite
+    
+    Logging -.-> HTTP-Layer & Handler-Layer & Service-Layer & Repository-Layer
+    ErrorHandling -.-> HTTP-Layer & Handler-Layer & Service-Layer & Repository-Layer
+    Metrics -.-> HTTP-Layer & Handler-Layer & Service-Layer & Repository-Layer
