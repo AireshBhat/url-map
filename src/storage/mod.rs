@@ -1,15 +1,18 @@
-use crate::models::ShortenedUrl;
-use crate::errors::UrlShortenerResult;
+mod memory;
+mod postgres;
+
+pub use memory::MemoryStorage;
+pub use postgres::PostgresStorage;
+
 use async_trait::async_trait;
 use std::sync::Arc;
-
-mod memory;
-pub use memory::MemoryStorage;
+use crate::errors::UrlShortenerResult;
+use crate::models::ShortenedUrl;
 
 /// The main storage trait that defines the interface for all storage backends
 #[async_trait]
 pub trait Storage: Send + Sync {
-    /// Saves a URL entry to storage
+    /// Saves a shortened URL to storage
     async fn save_url(&self, url: ShortenedUrl) -> UrlShortenerResult<ShortenedUrl>;
     
     /// Retrieves a shortened URL by its short code and increments the visit count
@@ -23,25 +26,22 @@ pub trait Storage: Send + Sync {
 pub type StorageRef = Arc<dyn Storage>;
 
 /// Configuration for storage backends
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct StorageConfig {
     /// The connection string for the database
     pub connection_string: String,
     /// The maximum number of connections in the pool
-    pub max_connections: u32,
-    /// The minimum number of connections in the pool
-    pub min_connections: u32,
+    pub max_connections: Option<u32>,
     /// The connection timeout in seconds
-    pub connection_timeout: u64,
+    pub connection_timeout_secs: Option<u64>,
 }
 
 impl Default for StorageConfig {
     fn default() -> Self {
         Self {
-            connection_string: "sqlite::memory:".to_string(),
-            max_connections: 10,
-            min_connections: 2,
-            connection_timeout: 30,
+            connection_string: "memory".to_string(),
+            max_connections: None,
+            connection_timeout_secs: None,
         }
     }
 } 

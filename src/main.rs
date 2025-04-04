@@ -3,21 +3,29 @@ use tracing::info;
 use tracing_subscriber::EnvFilter;
 use std::sync::Arc;
 
-mod routes;
+mod config;
+mod errors;
 mod handlers;
+mod models;
+mod routes;
 mod services;
 mod storage;
-mod models;
-mod errors;
 
-use services::UrlService;
-use storage::{MemoryStorage, StorageConfig};
+use crate::config::Config;
+use crate::services::UrlService;
+use crate::storage::PostgresStorage;
+
+#[derive(serde::Serialize)]
+struct HealthResponse {
+    status: String,
+    version: String,
+}
 
 async fn health_check() -> impl Responder {
-    HttpResponse::Ok().json(serde_json::json!({
-        "status": "ok",
-        "version": env!("CARGO_PKG_VERSION")
-    }))
+    HttpResponse::Ok().json(HealthResponse {
+        status: "ok".to_string(),
+        version: env!("CARGO_PKG_VERSION").to_string(),
+    })
 }
 
 #[actix_web::main]
@@ -27,13 +35,21 @@ async fn main() -> std::io::Result<()> {
         .with_env_filter(EnvFilter::from_default_env())
         .init();
 
-    info!("Starting URL Shortener Service...");
+    // Load configuration
+    let config = Config::from_env();
+    let server_config = config.clone();
 
-    // Create storage layer
-    let storage = Arc::new(MemoryStorage::new(StorageConfig::default()));
-    
-    // Create URL service with storage
+    // Initialize PostgreSQL storage
+    let storage = Arc::new(
+        PostgresStorage::new(config.to_storage_config())
+            .await
+            .expect("Failed to initialize PostgreSQL storage")
+    );
+
+    // Create URL service with PostgreSQL storage
     let url_service = web::Data::new(UrlService::new(storage));
+
+    info!("Starting server at http://{}:{}", server_config.host, server_config.port);
 
     HttpServer::new(move || {
         App::new()
@@ -48,7 +64,7 @@ async fn main() -> std::io::Result<()> {
             // Configure API routes
             .configure(routes::configure_routes)
     })
-    .bind("127.0.0.1:8080")?
+    .bind((server_config.host, server_config.port))?
     .run()
     .await
 }

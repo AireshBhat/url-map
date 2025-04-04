@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 /// Represents a shortened URL in the system
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct ShortenedUrl {
     /// Database ID (optional, may not be used in all storage backends)
     pub id: i64,
@@ -34,6 +34,6 @@ pub struct CreateUrlResponse {
 pub struct UrlStats {
     pub short_url: String,
     pub original_url: String,
-    pub created_at: DateTime<Utc>,
     pub visits: i64,
+    pub created_at: DateTime<Utc>,
 } 
