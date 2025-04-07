@@ -1,17 +1,20 @@
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use tracing::info;
-use tracing_subscriber::EnvFilter;
 use std::sync::Arc;
 
 mod config;
 mod errors;
 mod handlers;
+mod logging;
+mod middleware;
 mod models;
 mod routes;
 mod services;
 mod storage;
 
 use crate::config::Config;
+use crate::logging::init_logging;
+use crate::middleware::RequestLogger;
 use crate::services::UrlService;
 use crate::storage::PostgresStorage;
 
@@ -30,10 +33,8 @@ async fn health_check() -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    // Initialize logging
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .init();
+    // Initialize logging with JSON formatting
+    init_logging();
 
     // Load configuration
     let config = Config::from_env();
@@ -49,13 +50,19 @@ async fn main() -> std::io::Result<()> {
     // Create URL service with PostgreSQL storage
     let url_service = web::Data::new(UrlService::new(storage));
 
-    info!("Starting server at http://{}:{}", server_config.host, server_config.port);
+    info!(
+        host = %server_config.host,
+        port = %server_config.port,
+        "Starting server"
+    );
 
     HttpServer::new(move || {
         App::new()
             // Add URL service to application state
             .app_data(url_service.clone())
-            // Add logging middleware
+            // Add our custom request logger
+            .wrap(RequestLogger)
+            // Add tracing integration
             .wrap(tracing_actix_web::TracingLogger::default())
             // Add compression middleware
             .wrap(actix_web::middleware::Compress::default())
