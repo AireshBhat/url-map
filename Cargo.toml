@@ -26,6 +26,12 @@ async-trait = "0.1"
 nanoid = "0.4"
 futures = "0.3"
 sqlx = { version = "0.7", features = ["runtime-tokio", "tls-rustls", "postgres", "chrono", "uuid", "json"] }
+prometheus = { version = "0.13", features = ["process"], optional = true }
+lazy_static = "1.4"
+
+[features]
+default = []
+metrics = ["prometheus/process"]
 
 [dev-dependencies]
 reqwest = { version = "0.11", features = ["json"] }
