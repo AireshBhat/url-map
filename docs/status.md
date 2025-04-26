@@ -205,12 +205,12 @@
 ### Additional Features (Optional)
 
 1. Metrics Collection
-* [ ] Add feature flag `metrics` in Cargo.toml
-* [ ] Implement Prometheus metrics collection
-* [ ] Add metrics collection middleware
-* [ ] Track URL shortening operations
-* [ ] Track redirect latency
-* [ ] Track error rates
+* [x] Add feature flag `metrics` in Cargo.toml
+* [x] Implement Prometheus metrics collection
+* [x] Add metrics collection middleware
+* [x] Track URL shortening operations
+* [x] Track redirect latency
+* [x] Track error rates
 
 2. CI/CD Pipeline
 * [ ] Add GitHub Actions workflow

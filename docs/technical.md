@@ -5,79 +5,96 @@ This document outlines the technical architecture for a URL shortener service bu
 
 ## Technology Stack
 
-* Backend Framework: Actix-web
-* Database Access: SQLx (async SQL toolkit)
-* Language: Rust
-* Database: PostgreSQL/SQLite
-* Metrics: Prometheus (optional)
-* Logging: tracing/log crates
+* Backend Framework: Actix-web 4.4.0
+* Database Access: SQLx 0.7 (PostgreSQL)
+* Language: Rust 2021 Edition
+* Logging: tracing, tracing-subscriber, tracing-actix-web
+* Serialization: serde, serde_json
+* ID Generation: nanoid
+* Async Runtime: tokio 1.32.0
+* Error Handling: anyhow, thiserror
+* Metrics: prometheus-client (in progress)
 
 ## Core Architecture
 
 The system is designed as a layered architecture with the following components:
 
-This document outlines the key architectural layers of the URL Shortener Service project.
-
-**1. HTTP Layer**
+### 1. HTTP Layer (`src/main.rs`, `src/routes.rs`)
 
 The HTTP layer is implemented using Actix-web and handles all incoming HTTP requests. Key components:
 
 * **Server Setup**: Configured in `src/main.rs` using `HttpServer` and `App`
-* **Route Configuration**: Defined in `src/routes.rs` with endpoints for creating, accessing, and retrieving stats for shortened URLs
+* **Route Configuration**: Defined in `src/routes.rs` with endpoints for URL operations
 * **Middleware**: Includes:
-  * Logging middleware
+  * Logging middleware (`src/middleware/`)
   * Error handling middleware
-  * Rate limiting
-  * Compression
-  * Metrics collection (when feature-flagged)
+  * Request tracing
+  * Compression middleware
 
-**2. Handler Layer**
+### 2. Handler Layer (`src/handlers/`)
 
 The handler layer processes HTTP requests and delegates to the service layer. Key characteristics:
 
-* Located in `src/handlers/`
-* Handlers are organized by functionality:
-  * `url_handler.rs`: URL creation and redirection
-  * `stats_handler.rs`: Stats and metrics retrieval
+* Handlers are organized by functionality
 * Each handler:
   * Validates input parameters
   * Extracts request data
   * Calls appropriate service methods
   * Formats responses
 * Uses dependency injection for service access
+* Includes handlers for URL creation, redirection, and statistics
 
-**3. Service Layer**
+### 3. Service Layer (`src/services/`)
 
 The service layer contains business logic and orchestrates data operations:
 
-* Located in `src/services/`
 * Implements core business logic including:
   * URL shortening algorithm
-  * Unique ID generation
+  * Unique ID generation using nanoid
   * URL validation
-  * Statistics tracking
-* Communicates with storage layer through the `Storage` trait
+  * Access tracking
+* Communicates with storage layer through traits
 * Handles error mapping between layers
 
-**4. Storage Layer**
+### 4. Storage Layer (`src/storage/`)
 
 The storage layer handles data persistence:
 
-* **Storage Traits**: Defined in `src/storage/mod.rs`
-  * Abstract interfaces for data access
-  * Defines common operations (save, retrieve, update)
-  * Enables multiple storage backend implementations
-* **Storage Implementations**:
-  * PostgreSQL implementation using SQLx
-  * SQLite implementation (optional)
-  * In-memory implementation (for testing)
-  * Handles:
-    * Connection pooling
-    * Query execution
-    * Error handling
-    * Transaction management
+* **Storage Traits**: Abstract interfaces for data access
+* **PostgreSQL Implementation**: Using SQLx for async database operations
+* **In-Memory Implementation**: For testing and development
+* Handles:
+  * Connection pooling
+  * Query execution
+  * Error handling
+  * Transaction management
 
-**Key Architectural Patterns**
+### 5. Error Handling (`src/errors/`)
+
+Comprehensive error handling system:
+
+* Custom error types for different failure scenarios
+* Integration with Actix-web's error handling
+* Structured error propagation across layers
+* Error logging and tracing
+
+### 6. Configuration (`src/config.rs`)
+
+* Environment-based configuration
+* Database connection settings
+* Application settings
+* Logging configuration
+
+### 7. Logging (`src/logging.rs`)
+
+* Structured logging using tracing
+* Request/response logging
+* Error logging
+* Performance metrics
+* JSON formatting for logs
+* Correlation IDs for request tracking
+
+## Key Architectural Patterns
 
 1. **Trait-based Design**: Storage operations defined through traits for flexibility
 2. **Dependency Injection**: Services receive storage implementations via constructor
@@ -85,7 +102,7 @@ The storage layer handles data persistence:
 4. **Async/Await**: Leverages Rust's async capabilities for non-blocking I/O
 5. **Error Propagation**: Structured error handling across architectural layers
 
-**Data Flow**
+## Data Flow
 
 1. HTTP Request → HTTP Layer
 2. HTTP Layer → Handler Layer
@@ -94,19 +111,50 @@ The storage layer handles data persistence:
 5. Storage Layer → Database
 6. Response flows back up the chain
 
+## Development Guidelines
+
+1. **Error Handling**:
+   * Use custom error types for domain-specific errors
+   * Implement proper error propagation
+   * Log errors with context
+   * Provide meaningful error messages
+
+2. **Logging**:
+   * Use structured logging for all operations
+   * Include request IDs in logs
+   * Log errors with full context
+   * Use appropriate log levels
+
+3. **Testing**:
+   * Unit tests for business logic
+   * Integration tests for API endpoints
+   * Database tests for storage layer
+   * Error handling tests
+
+4. **Performance**:
+   * Use async/await for I/O operations
+   * Implement connection pooling
+   * Cache frequently accessed data
+   * Monitor and optimize database queries
+
+5. **Security**:
+   * Validate all inputs
+   * Sanitize URLs
+   * Implement rate limiting
+   * Use secure database connections
+
 ## Data Models
 
-### URL Model
+### URL Models (`src/models/mod.rs`)
 
 The URL model represents a shortened URL in the system:
 
 ```rust
-// src/models/url.rs
 #[derive(Debug, Clone, sqlx::FromRow, Serialize, Deserialize)]
 pub struct ShortenedUrl {
-    pub id: i64,  // Using DB-generated ID for simplicity
+    pub id: i64,  
     pub original_url: String,
-    pub short_url: String, // Short code for the URL
+    pub short_url: String, 
     pub created_at: DateTime<Utc>,
     pub visits: i64,
 }
@@ -122,6 +170,13 @@ pub struct CreateUrlResponse {
     pub original_url: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UrlStats {
+    pub short_url: String,
+    pub original_url: String,
+    pub visits: i64,
+    pub created_at: DateTime<Utc>,
+}
 ```
 
 # URL Shortener Error Handling Mechanism
@@ -223,7 +278,6 @@ impl fmt::Display for UrlShortenerError {
 }
 ```
 
-
 ### 3. HTTP Integration
 
 ```rust
@@ -281,7 +335,6 @@ impl From<sqlx::Error> for UrlShortenerError {
     }
 }
 ```
-
 
 ## Error Validation Helpers
 
