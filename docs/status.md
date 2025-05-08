@@ -29,6 +29,15 @@
   - HTTP Integration
   - Database Error Mapping
   - Custom Result Type
+- Metrics Implementation
+  - Basic metrics setup
+  - Prometheus integration
+  - HTTP metrics middleware
+  - Core metrics structures
+  - Metrics endpoint
+  - URL shortening metrics
+  - Redirect metrics
+  - Stats retrieval metrics
 
 ## In Progress
 - Project Setup
@@ -47,6 +56,13 @@
     - [x] Service layer logging
     - [x] Error logging
     - [x] Performance metrics
+  - [x] Implement metrics system
+    - [x] Add Prometheus dependencies
+    - [x] Add feature flag for metrics
+    - [x] Configure metrics endpoint
+    - [x] Add metrics middleware
+    - [x] Implement URL shortening metrics
+    - [x] Implement redirect metrics
 
 ## Pending
 
@@ -82,10 +98,9 @@
   - [x] Correlation IDs
   - [x] Error logging
   - [x] JSON formatting
-- [ ] Error handling middleware
-- [ ] Rate limiting middleware
+- [x] Error handling middleware
 - [x] Compression middleware
-- [ ] (Optional) Metrics collection middleware
+- [x] Metrics collection middleware
 
 ### Handler Layer
 - [x] Create URL shortening handler structure
